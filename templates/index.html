@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>LipaFast</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui;
+        background: #f8fafc;
+        padding: 20px;
+      }
+      .container {
+        max-width: 900px;
+        margin: auto;
+      }
+      header {
+        text-align: center;
+        margin-bottom: 25px;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+      }
+      .stat {
+        background: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      }
+      .card {
+        background: #fff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        margin-bottom: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        background: #f1f5f9;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      td {
+        padding: 12px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .status {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .active {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .inactive {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .btn {
+        padding: 8px 15px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .btn-edit {
+        background: #3b82f6;
+        color: white;
+      }
+      .btn-topup {
+        background: #10b981;
+        color: white;
+      }
+      .btn-delete {
+        background: #ef4444;
+        color: white;
+      }
+      .actions {
+        display: flex;
+        gap: 6px;
+      }
+      input {
+        padding: 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        width: 100%;
+      }
+      .popup {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+      }
+      .success {
+        background: #10b981;
+      }
+      .error {
+        background: #ef4444;
+      }
+
+      /* modal */
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      .modal-content {
+        background: #fff;
+        padding: 30px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <header>
+        <h1>LipaFast</h1>
+        <p>Driver Wallet System</p>
+      </header>
+
+      <div class="stats">
+        <div class="stat">
+          <h3>Total Drivers</h3>
+          <p>{{ total_drivers }}</p>
+        </div>
+        <div class="stat">
+          <h3>Total Balance</h3>
+          <p>KSh {{ "{:,.0f}".format(total_balance) }}</p>
+        </div>
+        <div class="stat">
+          <h3>Active</h3>
+          <p>{{ active_drivers }}</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Create Wallet</h2>
+        <form action="/wallet/new" method="post">
+          <input name="wallet_id" placeholder="Phone Number" required />
+          <input name="owner" placeholder="Driver Name" required />
+          <input
+            name="balance"
+            type="number"
+            placeholder="Initial Balance"
+            required
+          />
+          <button class="btn btn-edit">Create Wallet</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Wallets</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Driver</th>
+              <th>Balance</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for w in drivers %}
+            <tr>
+              <td>{{ w.wallet_id }}</td>
+              <td>{{ w.owner }}</td>
+              <td>KSh {{ "{:,.0f}".format(w.balance) }}</td>
+              <td><span class="status {{ w.status }}">{{ w.status }}</span></td>
+              <td class="actions">
+                <button
+                  class="btn btn-edit"
+                  onclick="editWallet({{ w.wallet_id }}, '{{ w.owner }}')"
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn btn-topup"
+                  onclick="openTopup({{ w.wallet_id }}, '{{ w.owner }}')"
+                >
+                  Top-up
+                </button>
+                <button
+                  class="btn btn-delete"
+                  onclick="deactivateWallet({{ w.wallet_id }})"
+                >
+                  Deactivate
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Make Payment</h2>
+        <form
+          action="/wallet/pay"
+          method="post"
+          onsubmit="return validatePayment()"
+        >
+          <input
+            id="pay_wallet"
+            name="wallet_id"
+            placeholder="Wallet ID"
+            required
+          />
+          <input
+            id="pay_amount"
+            name="amount"
+            type="number"
+            placeholder="Amount"
+            required
+          />
+          <button class="btn btn-topup">Process Payment</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Recent Transactions</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Driver</th>
+              <th>Wallet</th>
+              <th>Amount</th>
+              <th>Type</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tx in recent_transactions %}
+            <tr>
+              <td>{{ tx.transaction_id }}</td>
+              <td>{{ tx.owner }}</td>
+              <td>{{ tx.wallet_id }}</td>
+              <td>KSh {{ tx.amount }}</td>
+              <td>
+                <span
+                  class="status {% if tx.direction=='debit' %}inactive{% else %}active{% endif %}"
+                  >{{ tx.direction }}</span
+                >
+              </td>
+              <td>{{ tx.timestamp[:16] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="topupModal" class="modal">
+      <div class="modal-content">
+        <h3>Top-up Wallet</h3>
+        <p id="topupLabel"></p>
+        <input type="hidden" id="topupWalletId" />
+        <input
+          type="number"
+          id="topupAmount"
+          placeholder="Amount (KSh)"
+          min="1"
+        />
+        <button class="btn btn-topup" onclick="submitTopup()">Add Funds</button>
+        <button
+          class="btn"
+          onclick="closeTopup()"
+          style="background: #64748b; color: white"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const wallets={{ drivers|tojson }};
+
+      function popup(m,t){const p=document.createElement('div');p.className=`popup ${t}`;p.textContent=m;document.body.appendChild(p);setTimeout(()=>p.remove(),3000)}
+
+      function openTopup(id,owner){
+      document.getElementById('topupWalletId').value=id;
+      document.getElementById('topupLabel').textContent=`Wallet: ${owner} (${id})`;
+      document.getElementById('topupAmount').value='';
+      document.getElementById('topupModal').style.display='flex';
+      }
+
+      function closeTopup(){document.getElementById('topupModal').style.display='none'}
+
+      function submitTopup(){
+      const id=parseInt(document.getElementById('topupWalletId').value);
+      const amount=parseFloat(document.getElementById('topupAmount').value);
+      if(!amount||amount<=0)return popup('Invalid amount','error');
+
+      fetch('/wallet/edit',{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({wallet_id:id,topup:amount})
+      })
+      .then(r=>r.ok?popup('Top-up successful','success'):popup('Top-up failed','error'))
+      .then(()=>setTimeout(()=>location.reload(),800))
+      }
+
+      function editWallet(id,owner){
+      const n=prompt('Driver name:',owner);
+      if(!n||n===owner)return;
+      fetch('/wallet/edit',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({wallet_id:id,owner:n})})
+      .then(()=>location.reload())
+      }
+
+      function deactivateWallet(id){
+      if(!confirm('Deactivate wallet?'))return;
+      fetch('/wallet/delete',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({wallet_id:id})})
+      .then(()=>location.reload())
+      }
+
+      function validatePayment(){
+      const w=wallets.find(x=>x.wallet_id==document.getElementById('pay_wallet').value);
+      if(!w)return popup('Wallet not found','error')&&false;
+      if(w.status!='active')return popup('Wallet inactive','error')&&false;
+      if(w.balance<document.getElementById('pay_amount').value)return popup('Insufficient funds','error')&&false;
+      return true;
+      }
+
+      window.onclick=e=>{if(e.target.id==='topupModal')closeTopup()}
+    </script>
+  </body>
+</html>
